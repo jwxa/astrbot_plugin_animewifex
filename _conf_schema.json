@@ -18,16 +18,16 @@
         "hint": "每天最多更换老婆的次数"
     },
     "reset_max_uses_per_day": {
-        "description": "重置牛功能每天可使用次数",
+        "description": "重置功能每天可使用次数",
         "type": "int",
-        "default": 2,
-        "hint": "每天可以重置牛老婆的次数"
+        "default": 3,
+        "hint": "每天可以使用重置功能的次数"
     },
     "reset_success_rate": {
-        "description": "重置牛功能成功率",
+        "description": "重置功能成功率",
         "type": "float",
         "default": 0.30,
-        "hint": "重置牛老婆次数的成功率，取值范围 [0, 1]"
+        "hint": "重置功能的成功率，取值范围 [0, 1]"
     },
     "reset_mute_duration": {
         "description": "重置失败时禁言时长（秒）",

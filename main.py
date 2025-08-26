@@ -16,7 +16,7 @@ os.makedirs(IMG_DIR, exist_ok=True)
 NTR_STATUS_FILE = os.path.join(CONFIG_DIR, 'ntr_status.json')
 NTR_RECORDS_FILE = os.path.join(CONFIG_DIR, 'ntr_records.json')
 CHANGE_RECORDS_FILE = os.path.join(CONFIG_DIR, 'change_records.json')
-RESET_RECORDS_FILE = os.path.join(CONFIG_DIR, 'reset_ntr_records.json')
+RESET_SHARED_FILE = os.path.join(CONFIG_DIR, 'reset_shared_records.json')
 SWAP_REQUESTS_FILE = os.path.join(CONFIG_DIR, 'swap_requests.json')
 SWAP_LIMIT_FILE = os.path.join(CONFIG_DIR, 'swap_limit_records.json')
 
@@ -109,7 +109,7 @@ load_change_records()
 load_swap_requests()
 load_swap_limit_records()
 
-@register("astrbot_plugin_animewifex", "monbed", "群二次元老婆插件修改版", "1.5.9", "https://github.com/monbed/astrbot_plugin_animewifex")
+@register("astrbot_plugin_animewifex", "monbed", "群二次元老婆插件修改版", "1.6.0", "https://github.com/monbed/astrbot_plugin_animewifex")
 class WifePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -132,6 +132,7 @@ class WifePlugin(Star):
             "切换ntr开关状态": self.switch_ntr,
             "换老婆": self.change_wife,
             "重置牛": self.reset_ntr,
+            "重置换": self.reset_change_wife,
             "交换老婆": self.swap_wife,
             "同意交换": self.agree_swap_wife,
             "拒绝交换": self.reject_swap_wife,
@@ -352,7 +353,7 @@ class WifePlugin(Star):
             yield res
 
     async def reset_ntr(self, event: AstrMessageEvent):
-        # 重置牛老婆次数
+        # 重置牛老婆主逻辑
         gid = str(event.message_obj.group_id)
         uid = str(event.get_sender_id())
         nick = event.get_sender_name()
@@ -367,7 +368,8 @@ class WifePlugin(Star):
             yield event.chain_result(chain)
             return
 
-        reset_records = load_json(RESET_RECORDS_FILE)
+        # 共享次数记录
+        reset_records = load_json(RESET_SHARED_FILE)
         grp = reset_records.setdefault(gid, {})
         rec = grp.get(uid, {'date': today, 'count': 0})
         if rec.get('date') != today:
@@ -377,7 +379,7 @@ class WifePlugin(Star):
             return
         rec['count'] += 1
         grp[uid] = rec
-        save_json(RESET_RECORDS_FILE, reset_records)
+        save_json(RESET_SHARED_FILE, reset_records)
 
         tid = self.parse_at_target(event) or uid
         if random.random() < self.reset_success_rate:
@@ -392,6 +394,54 @@ class WifePlugin(Star):
             except:
                 pass
             yield event.plain_result(f'{nick}，重置牛失败，被禁言{self.reset_mute_duration}秒，下次记得再接再厉哦~')
+
+    async def reset_change_wife(self, event: AstrMessageEvent):
+        # 重置换老婆主逻辑
+        gid = str(event.message_obj.group_id)
+        uid = str(event.get_sender_id())
+        nick = event.get_sender_name()
+        today = get_today()
+        # 管理员可@指定用户
+        if uid in self.admins:
+            tid = self.parse_at_target(event) or uid
+            change_records = load_json(CHANGE_RECORDS_FILE)
+            grp = change_records.setdefault(gid, {})
+            if tid in grp:
+                del grp[tid]
+                save_json(CHANGE_RECORDS_FILE, change_records)
+            chain = [Plain('管理员操作：已重置'), At(qq=int(tid)), Plain('的换老婆次数。')]
+            yield event.chain_result(chain)
+            return
+
+        # 普通用户每日次数限制（与重置牛老婆次数共享）
+        reset_records = load_json(RESET_SHARED_FILE)
+        grp = reset_records.setdefault(gid, {})
+        rec = grp.get(uid, {'date': today, 'count': 0})
+        if rec.get('date') != today:
+            rec = {'date': today, 'count': 0}
+        if rec['count'] >= self.reset_max_uses_per_day:
+            yield event.plain_result(f'{nick}，你今天已经用完{self.reset_max_uses_per_day}次重置机会啦，明天再来吧~')
+            return
+        rec['count'] += 1
+        grp[uid] = rec
+        save_json(RESET_SHARED_FILE, reset_records)
+
+        tid = self.parse_at_target(event) or uid
+        # 成功率同reset_success_rate
+        if random.random() < self.reset_success_rate:
+            change_records = load_json(CHANGE_RECORDS_FILE)
+            grp2 = change_records.setdefault(gid, {})
+            if tid in grp2:
+                del grp2[tid]
+                save_json(CHANGE_RECORDS_FILE, change_records)
+            chain = [Plain('已重置'), At(qq=int(tid)), Plain('的换老婆次数。')]
+            yield event.chain_result(chain)
+        else:
+            try:
+                await event.bot.set_group_ban(group_id=int(gid), user_id=int(uid), duration=self.reset_mute_duration)
+            except:
+                pass
+            yield event.plain_result(f'{nick}，重置换失败，被禁言{self.reset_mute_duration}秒，下次记得再接再厉哦~')
 
     async def swap_wife(self, event: AstrMessageEvent):
         # 发起交换老婆请求
