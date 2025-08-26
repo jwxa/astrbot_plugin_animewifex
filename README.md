@@ -38,6 +38,8 @@ v1.5.9使用!代替#拼接老婆出处与名称，解决图床访问问题，**�
 
 v1.6.0添加重置换老婆功能，重置功能合并，共享使用次数。
 
+v1.6.1修复重置换老婆逻辑
+
 ## 相关
 - [astrbot_plugin_AW](https://github.com/zgojin/astrbot_plugin_AW)
 - [Astrbot](https://astrbot.app/)

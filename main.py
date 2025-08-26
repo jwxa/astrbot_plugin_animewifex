@@ -109,7 +109,7 @@ load_change_records()
 load_swap_requests()
 load_swap_limit_records()
 
-@register("astrbot_plugin_animewifex", "monbed", "群二次元老婆插件修改版", "1.6.0", "https://github.com/monbed/astrbot_plugin_animewifex")
+@register("astrbot_plugin_animewifex", "monbed", "群二次元老婆插件修改版", "1.6.1", "https://github.com/monbed/astrbot_plugin_animewifex")
 class WifePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -401,14 +401,16 @@ class WifePlugin(Star):
         uid = str(event.get_sender_id())
         nick = event.get_sender_name()
         today = get_today()
+
         # 管理员可@指定用户
         if uid in self.admins:
             tid = self.parse_at_target(event) or uid
-            change_records = load_json(CHANGE_RECORDS_FILE)
             grp = change_records.setdefault(gid, {})
             if tid in grp:
                 del grp[tid]
-                save_json(CHANGE_RECORDS_FILE, change_records)
+                if not grp:
+                    del change_records[gid]
+                save_change_records()
             chain = [Plain('管理员操作：已重置'), At(qq=int(tid)), Plain('的换老婆次数。')]
             yield event.chain_result(chain)
             return
@@ -427,13 +429,14 @@ class WifePlugin(Star):
         save_json(RESET_SHARED_FILE, reset_records)
 
         tid = self.parse_at_target(event) or uid
-        # 成功率同reset_success_rate
+         # 成功率同reset_success_rate
         if random.random() < self.reset_success_rate:
-            change_records = load_json(CHANGE_RECORDS_FILE)
             grp2 = change_records.setdefault(gid, {})
             if tid in grp2:
                 del grp2[tid]
-                save_json(CHANGE_RECORDS_FILE, change_records)
+                if not grp2:
+                    del change_records[gid]
+                save_change_records()
             chain = [Plain('已重置'), At(qq=int(tid)), Plain('的换老婆次数。')]
             yield event.chain_result(chain)
         else:
