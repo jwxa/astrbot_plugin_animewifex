@@ -227,7 +227,7 @@ class WifePlugin(Star):
             write_group_config(gid, uid, img, today, nick, cfg)
         else:
             img = cfg[uid][0]
-        # 新增：解析出处和角色名，分隔符为!
+        # 解析出处和角色名，分隔符为!
         name = os.path.splitext(img)[0]
         if "!" in name:
             source, chara = name.split("!", 1)
@@ -284,7 +284,7 @@ class WifePlugin(Star):
             yield event.plain_result(f"{nick}，牛老婆成功！老婆已归你所有，恭喜恭喜~")
             if cancel_msg:
                 yield event.plain_result(cancel_msg)
-            # 立即为新老婆抽取并展示
+            # 立即展示新老婆
             async for res in self.animewife(event):
                 yield res
         else:
@@ -305,7 +305,7 @@ class WifePlugin(Star):
         img = cfg[tid][0]
         name = os.path.splitext(img)[0]
         owner = cfg[tid][2]
-        # 新增：解析出处和角色名，分隔符为!
+        # 解析出处和角色名，分隔符为!
         if "!" in name:
             source, chara = name.split("!", 1)
             text = f"{owner}的老婆是来自《{source}》的{chara}，羡慕吗？"
@@ -369,7 +369,7 @@ class WifePlugin(Star):
         cancel_msg = await self.cancel_swap_on_wife_change(gid, [uid])
         if cancel_msg:
             yield event.plain_result(cancel_msg)
-        # 立即为新老婆抽取并展示
+        # 立即展示新老婆
         async for res in self.animewife(event):
             yield res
 
