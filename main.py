@@ -122,7 +122,7 @@ load_swap_limit_records()
     "astrbot_plugin_animewifex",
     "monbed",
     "群二次元老婆插件修改版",
-    "1.6.1",
+    "1.6.2",
     "https://github.com/monbed/astrbot_plugin_animewifex",
 )
 class WifePlugin(Star):
