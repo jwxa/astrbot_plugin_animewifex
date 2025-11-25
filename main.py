@@ -1,11 +1,15 @@
+import json
+import os
+import random
+import re
+from datetime import datetime, timedelta
+
+import aiohttp
+from astrbot.api import logger
 from astrbot.api.all import *
 from astrbot.api.star import StarTools
-from datetime import datetime, timedelta
-import random
-import os
-import re
-import json
-import aiohttp
+
+from .animewife_syncer import AnimeWifeSyncer, DEFAULT_FILENAME_PATTERN
 
 PLUGIN_DIR = StarTools.get_data_dir("astrbot_plugin_animewifex")
 CONFIG_DIR = os.path.join(PLUGIN_DIR, "config")
@@ -18,6 +22,10 @@ CHANGE_RECORDS_FILE = os.path.join(CONFIG_DIR, "change_records.json")
 RESET_SHARED_FILE = os.path.join(CONFIG_DIR, "reset_shared_records.json")
 SWAP_REQUESTS_FILE = os.path.join(CONFIG_DIR, "swap_requests.json")
 SWAP_LIMIT_FILE = os.path.join(CONFIG_DIR, "swap_limit_records.json")
+SYNC_STATE_FILE = os.path.join(CONFIG_DIR, "repo_sync_state.json")
+DEFAULT_REPO_URL = "https://github.com/monbed/wife"
+DEFAULT_BRANCH = "main"
+DEFAULT_CDN_PREFIX = ""
 
 
 def get_today():
@@ -122,7 +130,7 @@ load_swap_limit_records()
     "astrbot_plugin_animewifex",
     "monbed",
     "群二次元老婆插件修改版",
-    "1.6.2",
+    "1.7.0",
     "https://github.com/monbed/astrbot_plugin_animewifex",
 )
 class WifePlugin(Star):
@@ -130,14 +138,23 @@ class WifePlugin(Star):
         super().__init__(context)
         self.config = config
         # 配置参数初始化
-        self.ntr_max = config.get("ntr_max")
-        self.ntr_possibility = config.get("ntr_possibility")
-        self.change_max_per_day = config.get("change_max_per_day")
-        self.reset_max_uses_per_day = config.get("reset_max_uses_per_day")
-        self.reset_success_rate = config.get("reset_success_rate")
-        self.reset_mute_duration = config.get("reset_mute_duration")
-        self.image_base_url = config.get("image_base_url")
-        self.swap_max_per_day = config.get("swap_max_per_day")
+        rules_config: Dict = config.get("rules", {})
+        self.ntr_max = rules_config.get("ntr_max")
+        self.ntr_possibility = rules_config.get("ntr_possibility")
+        self.change_max_per_day = rules_config.get("change_max_per_day")
+        self.reset_max_uses_per_day = rules_config.get("reset_max_uses_per_day")
+        self.reset_success_rate = rules_config.get("reset_success_rate")
+        self.reset_mute_duration = rules_config.get("reset_mute_duration")
+        self.image_base_url = (rules_config.get("image_base_url") or "").rstrip("/")
+        self.swap_max_per_day = rules_config.get("swap_max_per_day")
+        blocklist_raw = rules_config.get("ntr_blocklist") or []
+        if isinstance(blocklist_raw, str):
+            blocklist_raw = [blocklist_raw]
+        self.ntr_blocklist = {
+            str(item).strip()
+            for item in blocklist_raw
+            if str(item).strip()
+        }
         # 命令与处理函数映射
         self.commands = {
             "抽老婆": self.animewife,
@@ -151,28 +168,49 @@ class WifePlugin(Star):
             "同意交换": self.agree_swap_wife,
             "拒绝交换": self.reject_swap_wife,
             "查看交换请求": self.view_swap_requests,
+            "同步图包": self.sync_repo_now,
         }
+        defaults = {
+            "repo_url": DEFAULT_REPO_URL,
+            "branch": DEFAULT_BRANCH,
+            "cdn_prefix": DEFAULT_CDN_PREFIX,
+            "filename_pattern": DEFAULT_FILENAME_PATTERN,
+        }
+        self.syncer = AnimeWifeSyncer(
+            config=config,
+            img_dir=IMG_DIR,
+            state_file=SYNC_STATE_FILE,
+            repo_base_dir=PLUGIN_DIR,
+            defaults=defaults,
+        )
         self.admins = self.load_admins()
+        logger.info(f"admins: {self.admins}")
+
+    async def initialize(self):
+        await self.syncer.initialize()
+
+    async def terminate(self):
+        await self.syncer.terminate()
 
     def load_admins(self):
-        # 加载管理员列表
+        # 读取管理员列表（与 AstrBot cmd_config 兼容）
         path = os.path.join("data", "cmd_config.json")
         try:
             with open(path, "r", encoding="utf-8-sig") as f:
                 cfg = json.load(f)
                 return cfg.get("admins_id", [])
-        except:
+        except Exception:
             return []
 
     def parse_at_target(self, event):
         # 解析@目标用户
-        for comp in event.message_obj.message:
+        for comp in getattr(event.message_obj, "message", []):
             if isinstance(comp, At):
                 return str(comp.qq)
         return None
 
     def parse_target(self, event):
-        # 解析命令目标用户
+        # 解析命令目标用户（支持@或昵称包含匹配）
         target = self.parse_at_target(event)
         if target:
             return target
@@ -183,10 +221,20 @@ class WifePlugin(Star):
                 group_id = str(event.message_obj.group_id)
                 cfg = load_group_config(group_id)
                 for uid, data in cfg.items():
-                    nick = event.get_sender_name()
+                    nick = data[2] if isinstance(data, (list, tuple)) and len(data) >= 3 else None
                     if nick and re.search(re.escape(name), nick, re.IGNORECASE):
                         return uid
         return None
+
+    def _build_remote_image_url(self, filename: str) -> str:
+        if not self.image_base_url:
+            return filename
+        if self.image_base_url.endswith("/"):
+            return f"{self.image_base_url}{filename}"
+        return f"{self.image_base_url}/{filename}"
+
+    async def _ensure_local_images_ready(self):
+        return await self.syncer.ensure_local_images_ready()
 
     @event_message_type(EventMessageType.ALL)
     async def on_all_messages(self, event: AstrMessageEvent):
@@ -200,6 +248,24 @@ class WifePlugin(Star):
                     yield res
                 break
 
+    async def sync_repo_now(self, event: AstrMessageEvent):
+        gid = str(event.message_obj.group_id)
+        uid = str(event.get_sender_id())
+        nick = event.get_sender_name()
+        if uid not in self.admins:
+            yield event.plain_result(f"{nick}，你没有权限操作哦~")
+            return
+        yield event.plain_result("开始同步图包，请稍等…")
+        try:
+            updated = await self.syncer.sync_repos(force=True)
+            if updated:
+                yield event.plain_result("同步完成，已更新新的图片资源~")
+            else:
+                yield event.plain_result("同步完成，本次没有新增图片。")
+        except Exception as exc:
+            logger.warning(f"手动同步失败: {exc}")
+            yield event.plain_result(f"同步失败：{exc}")
+
     async def animewife(self, event: AstrMessageEvent):
         # 抽老婆主逻辑
         gid = str(event.message_obj.group_id)
@@ -211,18 +277,28 @@ class WifePlugin(Star):
             # 如果今天还没抽，重新抽取
             if uid in cfg:
                 del cfg[uid]
-            local_imgs = os.listdir(IMG_DIR)
+            logger.info(IMG_DIR)
+            local_imgs = await self._ensure_local_images_ready()
             if local_imgs:
                 img = random.choice(local_imgs)
-            else:
+            elif self.image_base_url:
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(self.image_base_url) as resp:
-                            text = await resp.text()
-                            img = random.choice(text.splitlines())
-                except:
+                            resp.raise_for_status()
+                            candidates = [
+                                line.strip()
+                                for line in (await resp.text()).splitlines()
+                                if line.strip()
+                            ]
+                            img = random.choice(candidates)
+                except Exception as exc:
+                    logger.warning(f"拉取远程图片列表失败: {exc}")
                     yield event.plain_result("抱歉，今天的老婆获取失败了，请稍后再试~")
                     return
+            else:
+                yield event.plain_result("抱歉，今天的老婆获取失败了，请稍后再试~")
+                return
             cfg[uid] = [img, today, nick]
             write_group_config(gid, uid, img, today, nick, cfg)
         else:
@@ -238,7 +314,7 @@ class WifePlugin(Star):
         if os.path.exists(path):
             chain = [Plain(text), Image.fromFileSystem(path)]
         else:
-            chain = [Plain(text), Image.fromURL(self.image_base_url + img)]
+            chain = [Plain(text), Image.fromURL(self._build_remote_image_url(img))]
         try:
             yield event.chain_result(chain)
         except:
@@ -268,6 +344,13 @@ class WifePlugin(Star):
             yield event.plain_result(f"{nick}，{msg}")
             return
         cfg = load_group_config(gid)
+        if tid in self.ntr_blocklist:
+            msg = "对方是“纯爱守护名单”的真爱对象，换个目标试试吧~"
+            try:
+                yield event.chain_result([Plain(msg), At(qq=int(tid))])
+            except Exception:
+                yield event.plain_result(msg)
+            return
         if tid not in cfg or cfg[tid][1] != today:
             yield event.plain_result("对方今天还没有老婆可牛哦~")
             return
@@ -317,7 +400,7 @@ class WifePlugin(Star):
             (
                 Image.fromFileSystem(path)
                 if os.path.exists(path)
-                else Image.fromURL(self.image_base_url + img)
+                else Image.fromURL(self._build_remote_image_url(img))
             ),
         ]
         try:
@@ -377,6 +460,7 @@ class WifePlugin(Star):
         # 重置牛老婆主逻辑
         gid = str(event.message_obj.group_id)
         uid = str(event.get_sender_id())
+        logger.info(f"reset_ntr uid:{uid}")
         nick = event.get_sender_name()
         today = get_today()
         if uid in self.admins:

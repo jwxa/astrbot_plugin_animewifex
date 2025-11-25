@@ -24,6 +24,13 @@
 - `同意交换` @用户同意
 - `拒绝交换` @用户拒绝
 - `查看交换请求` 查看交换老婆请求
+- `同步图包` 管理员手动触发一次图包同步（立即下载/拉取最新图片）
+
+## 同步图包相关属性
+- `repo_sources`：图包源列表，单项可指定 `type=git download|git repo`（默认 git download）、`repo_url`/`repo_branch`、`paths`/`repo_image_paths`（扫描目录）、`use_repo_cdn`、`repo_cdn_prefix`。`git repo` 会在插件数据目录 clone 后定时 `git pull`，`git download` 以 ZIP 下载解压。
+- `repo_url` / `repo_branch` / `repo_image_paths`：当 `repo_sources` 为空时的默认主源配置（回退）。
+- `repo_sync_cron`：定时同步 Cron 表达式（默认每 6 小时）。
+- `use_repo_cdn` / `repo_cdn_prefix`：是否启用 GitHub 下载加速前缀。
 
 ## 更新日志 ##
 v1.5.5完善交换老婆逻辑，牛老婆成功后立刻显示。
@@ -41,6 +48,8 @@ v1.6.0添加重置换老婆功能，重置功能合并，共享使用次数。
 v1.6.1修复重置换老婆逻辑
 
 v1.6.2添加logo
+
+v1.7.0增加纯爱守护名单，增加同步图包功能
 
 ## 相关
 - [astrbot_plugin_AW](https://github.com/zgojin/astrbot_plugin_AW)

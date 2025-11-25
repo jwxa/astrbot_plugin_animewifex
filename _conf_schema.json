@@ -1,50 +1,100 @@
 {
-    "ntr_max": {
-        "description": "每日可牛老婆次数",
-        "type": "int",
-        "default": 3,
-        "hint": "每天可以牛老婆的次数"
+    "sync": {
+        "description": "同步图包配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "repo_sync_cron": {
+                "description": "自动同步 Cron 表达式",
+                "type": "string",
+                "default": "0 */6 * * *",
+                "hint": "Cron 表达式，默认每 6 小时同步一次"
+            },
+            "repo_sources": {
+                "description": "图包资源列表",
+                "type": "list",
+                "default": [],
+                "hint": "每项：url(支持 https://github.com/org/repo/tree/branch)、branch(可选)、type=git download|git repo、paths/repo_image_paths、use_repo_cdn、repo_cdn_prefix"
+            },
+            "use_repo_cdn": {
+                "description": "启用 CDN 加速下载",
+                "type": "bool",
+                "default": false,
+                "hint": "开启后 GitHub 下载将附加 CDN 前缀"
+            },
+            "repo_cdn_prefix": {
+                "description": "CDN 加速前缀",
+                "type": "string",
+                "default": "https://mirror.ghproxy.com",
+                "hint": "如 https://mirror.ghproxy.com"
+            },
+            "filename_pattern": {
+                "description": "文件名正则过滤",
+                "type": "string",
+                "default": "^[^!]+![^!]+\\.[^!]+$",
+                "hint": "匹配通过的文件名才会落盘，默认要求文件名中有且仅有 1 个 “!”"
+            }
+        }
     },
-    "ntr_possibility": {
-        "description": "NTR 成功概率",
-        "type": "float",
-        "default": 0.20,
-        "hint": "牛老婆成功的概率，取值范围 [0, 1]"
-    },
-    "change_max_per_day": {
-        "description": "每天换老婆最大次数",
-        "type": "int",
-        "default": 3,
-        "hint": "每天最多更换老婆的次数"
-    },
-    "reset_max_uses_per_day": {
-        "description": "重置功能每天可使用次数",
-        "type": "int",
-        "default": 3,
-        "hint": "每天可以使用重置功能的次数"
-    },
-    "reset_success_rate": {
-        "description": "重置功能成功率",
-        "type": "float",
-        "default": 0.30,
-        "hint": "重置功能的成功率，取值范围 [0, 1]"
-    },
-    "reset_mute_duration": {
-        "description": "重置失败时禁言时长（秒）",
-        "type": "int",
-        "default": 300,
-        "hint": "重置失败后禁言时长，单位秒"
-    },
-    "image_base_url": {
-        "description": "图片服务器基础 URL",
-        "type": "string",
-        "default": "",
-        "hint": "用于拉取二次元老婆图片的基础地址"
-    },
-    "swap_max_per_day": {
-        "description": "交换老婆功能每天可使用次数",
-        "type": "int",
-        "default": 2,
-        "hint": "每天可以交换老婆的次数"
+    "rules": {
+        "description": "规则配置",
+        "type": "object",
+        "hint": "",
+        "items": {
+            "image_base_url": {
+                "description": "图片服务器基础 URL",
+                "type": "string",
+                "default": "",
+                "hint": "用于拉取二次元老婆图片的基础地址"
+            },
+            "ntr_max": {
+                "description": "每日可牛老婆次数",
+                "type": "int",
+                "default": 3,
+                "hint": "每天可以牛老婆的次数"
+            },
+            "ntr_possibility": {
+                "description": "NTR 成功概率",
+                "type": "float",
+                "default": 0.20,
+                "hint": "牛老婆成功的概率，取值范围 [0, 1]"
+            },
+            "change_max_per_day": {
+                "description": "每天换老婆最大次数",
+                "type": "int",
+                "default": 3,
+                "hint": "每天最多更换老婆的次数"
+            },
+            "reset_max_uses_per_day": {
+                "description": "重置功能每天可使用次数",
+                "type": "int",
+                "default": 3,
+                "hint": "每天可以使用重置功能的次数"
+            },
+            "reset_success_rate": {
+                "description": "重置功能成功率",
+                "type": "float",
+                "default": 0.30,
+                "hint": "重置功能的成功率，取值范围 [0, 1]"
+            },
+            "reset_mute_duration": {
+                "description": "重置失败时禁言时长（秒）",
+                "type": "int",
+                "default": 300,
+                "hint": "重置失败后禁言时长，单位秒"
+            },
+            "swap_max_per_day": {
+                "description": "交换老婆功能每天可使用次数",
+                "type": "int",
+                "default": 2,
+                "hint": "每天可以交换老婆的次数"
+            },
+            "ntr_blocklist": {
+                "description": "纯爱守护名单",
+                "type": "list",
+                "default": [],
+                "hint": "target_id 列表，在名单中的对象视为真爱，无法被“牛老婆”命令影响"
+            }
+        }
     }
 }
